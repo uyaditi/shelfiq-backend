@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 
 from routes import chat, rag
+from routes.data import router as data_router
 
 load_dotenv()
 
@@ -19,6 +20,7 @@ app.add_middleware(
 
 app.include_router(chat.router, prefix="/api")
 app.include_router(rag.router, prefix="/api")
+app.include_router(data_router, prefix="/api")
 
 @app.get("/health")
 def health():
