@@ -9,7 +9,7 @@ DB_HOST = os.getenv("DB_HOST", "retail-dashboard-db.cvwyeswgqozz.eu-north-1.rds.
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "postgres")
 DB_USER = os.getenv("DB_USER", "AWS_AFB")
-DB_PASS = os.getenv("DB_PASS", "AWS$Aditi1")
+DB_PASS = os.getenv("DB_PASS")
 
 engine = create_engine(
     f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}",

@@ -1,62 +1,47 @@
 import os
+import uuid
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from services.bedrock import get_bedrock_agent_client
 
 router = APIRouter()
 
-class RAGRequest(BaseModel):
+class AgentRequest(BaseModel):
     query: str
+    session_id: str = None  # Optional: Pass this from the frontend to remember conversation history
 
-PROMPT_TEMPLATE = """You are a retail data analyst with access to live store data.
-Use the store data below to answer the query with specific numbers, SKUs, and 
-actionable recommendations. If data is insufficient, say so clearly.
-
-Store Data:
-$search_results$
-
-Query: $query$"""
-
-@router.post("/chat/rag")
-async def rag_chat(request: RAGRequest):
+@router.post("/chat/agent")
+async def agent_chat(request: AgentRequest):
     client = get_bedrock_agent_client()
-    region = os.getenv("AWS_REGION")
-    kb_id = os.getenv("BEDROCK_KB_ID")
+    agent_id = os.getenv("BEDROCK_AGENT_ID")
+    agent_alias_id = os.getenv("BEDROCK_AGENT_ALIAS_ID", "TSTALIASID")
+    
+    # Agents require a session ID to remember chat history. 
+    # If the frontend doesn't provide one, generate a new one.
+    session_id = request.session_id or str(uuid.uuid4())
 
     try:
-        response = client.retrieve_and_generate(
-            input={"text": request.query},
-            retrieveAndGenerateConfiguration={
-                "type": "KNOWLEDGE_BASE",
-                "knowledgeBaseConfiguration": {
-                    "knowledgeBaseId": kb_id,
-                    "modelArn": f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-sonnet-4-5",
-                    "generationConfiguration": {
-                        "promptTemplate": {
-                            "textPromptTemplate": PROMPT_TEMPLATE
-                        }
-                    },
-                    "retrievalConfiguration": {
-                        "vectorSearchConfiguration": {
-                            "numberOfResults": 5  # how many KB chunks to retrieve
-                        }
-                    }
-                }
-            }
+        response = client.invoke_agent(
+            agentId=agent_id,
+            agentAliasId=agent_alias_id,
+            sessionId=session_id,
+            inputText=request.query
         )
 
-        citations = []
-        for citation in response.get("citations", []):
-            for ref in citation.get("retrievedReferences", []):
-                citations.append({
-                    "text": ref["content"]["text"][:200],   # snippet preview
-                    "source": ref["location"].get("s3Location", {}).get("uri", "")
-                })
+        completion_text = ""
+        
+        # The agent returns a stream of events. We need to loop through and extract the text chunks.
+        for event in response.get("completion"):
+            if "chunk" in event:
+                chunk = event["chunk"]
+                completion_text += chunk["bytes"].decode("utf-8")
+            # You can also catch "trace" events here if you want to log the exact SQL query the agent wrote!
 
         return {
-            "reply": response["output"]["text"],
-            "citations": citations   # send to frontend optionally
+            "reply": completion_text,
+            "session_id": session_id
         }
 
     except Exception as e:
+        print(f"Agent Error: {e}") # Helpful for backend debugging
         raise HTTPException(status_code=500, detail=str(e))

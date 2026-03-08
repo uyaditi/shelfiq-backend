@@ -2,14 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from db import get_db
-from models import RetailStock, RetailCustomer
-from schemas import (
+from models.models import RetailStock, RetailCustomer
+from schemas.schemas import (
     StockCreate, StockUpdate, StockResponse,
     CustomerCreate, CustomerUpdate, CustomerResponse
 )
 
 router = APIRouter(prefix="/data", tags=["Data"])
-
 
 
 @router.get("/stock", response_model=List[StockResponse])
