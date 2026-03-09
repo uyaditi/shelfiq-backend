@@ -1,15 +1,15 @@
-import json
-import boto3
+import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List
-from services.bedrock import get_bedrock_client
+
+import google.generativeai as genai
 
 router = APIRouter()
 
 
 class Message(BaseModel):
-    role: str      # "user" or "assistant"
+    role: str       # "user" or "assistant"
     content: str
 
 
@@ -23,27 +23,39 @@ supplier negotiation, and customer experience. Be concise, use bullet points, an
 ground advice in practical retail context. When relevant, ask about store type or size."""
 
 
+def _get_gemini_model():
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY is not set in .env")
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel(
+        model_name="gemini-2.5-flash-lite",
+        system_instruction=SYSTEM_PROMPT
+    )
+
+
 @router.post("/chat/general")
 async def general_chat(request: ChatRequest):
-    client = get_bedrock_client()
-
-    body = json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 1000,
-        "system": SYSTEM_PROMPT,
-        "messages": [m.model_dump() for m in request.messages]
-    })
-
     try:
-        response = client.invoke_model(
-            modelId="anthropic.claude-3-haiku-20240307-v1:0",
-            contentType="application/json",
-            accept="application/json",
-            body=body
-        )
-        result = json.loads(response["body"].read())
-        return {"reply": result["content"][0]["text"]}
+        model = _get_gemini_model()
+
+        # Convert messages to Gemini format
+        # Gemini uses "user" and "model" (not "assistant")
+        history = []
+        for m in request.messages[:-1]:   # all but the last message go into history
+            history.append({
+                "role": "model" if m.role == "assistant" else "user",
+                "parts": [m.content]
+            })
+
+        # The last message is the one we send now
+        last_message = request.messages[-1].content
+
+        chat = model.start_chat(history=history)
+        response = chat.send_message(last_message)
+
+        return {"reply": response.text.strip()}
 
     except Exception as e:
-        print(f"General Chat Error: {e}")  # Helpful for backend debugging
+        print(f"General Chat Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
