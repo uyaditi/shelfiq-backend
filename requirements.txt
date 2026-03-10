@@ -4,7 +4,7 @@ dotenv
 pydantic
 google-generativeai
 pandas
-sqlachemy
+sqlalchemy
 psycopg2
 ultralytics
 tabulate
