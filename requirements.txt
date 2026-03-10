@@ -1,11 +1,11 @@
 fastapi
 uvicorn
-dotenv
+python-dotenv
 pydantic
 google-generativeai
 pandas
 sqlalchemy
-psycopg2
+psycopg2-binary
 ultralytics
 tabulate
 #any add 
