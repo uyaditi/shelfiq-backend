@@ -27,7 +27,7 @@ def _get_gemini_model():
     if not api_key:
         raise ValueError("GEMINI_API_KEY is not set in .env")
     genai.configure(api_key=api_key)
-    return genai.GenerativeModel("gemini-2.5-flash-lite")
+    return genai.GenerativeModel("gemini-2.5-flash")
 
 
 # ---------------------------------------------------------------------------
